@@ -35,7 +35,10 @@ targets:
     default: true
     workspace:
       host: https://adb-7405615069613536.16.azuredatabricks.net
+      
   prod:
     mode: production
     workspace:
       host: https://adb-7405615069613536.16.azuredatabricks.net
+      # ADDED THIS LINE TO FIX THE PRODUCTION ROOT PATH ERROR:
+      root_path: /Workspace/Users/vamshidil123@gmail.com/.bundle/${bundle.name}/${bundle.target}
