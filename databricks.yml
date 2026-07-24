@@ -15,7 +15,20 @@ resources:
     banking_etl_pipeline:
       name: Banking_Lakehouse_ETL_Pipeline
 
+
       tasks:
+        - task_key: download_sample_data
+          existing_cluster_id: ${var.existing_cluster_id}
+          notebook_task:
+            notebook_path: ./notebooks/00_download_sample_data.py
+            base_parameters:
+              storage_account: ${var.storage_account_name}
+
+        - task_key: setup_environment
+          depends_on:
+            - task_key: download_sample_data
+          existing_cluster_id: ${var.existing_cluster_id}
+
         - task_key: setup_environment
           existing_cluster_id: ${var.existing_cluster_id}
           notebook_task:
