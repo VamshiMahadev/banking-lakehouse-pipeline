@@ -1,10 +1,6 @@
 name: Banking Pipeline CI/CD
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 defaults:
@@ -17,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Databricks CLI
@@ -28,16 +24,17 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
+          echo "Validating Databricks Bundle..."
           databricks bundle validate -t dev
+          echo "Bundle validation completed successfully."
 
   deploy:
-    name: Deploy Bundle to Workspace
+    name: Deploy Bundle to Databricks
     needs: validate
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Databricks CLI
@@ -48,16 +45,17 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
+          echo "Deploying Databricks Bundle..."
           databricks bundle deploy -t prod
+          echo "Bundle deployed successfully."
 
   run-and-verify:
-    name: Execute Pipeline
+    name: Execute Banking ETL Pipeline
     needs: deploy
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Databricks CLI
