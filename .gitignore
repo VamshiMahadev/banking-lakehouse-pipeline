@@ -11,7 +11,7 @@ __pycache__/
 .vscode/
 .idea/
 
-*.csv
+
 *.json
 *.parquet
 *.xlsx
