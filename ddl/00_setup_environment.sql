@@ -4,28 +4,26 @@ CREATE WIDGET TEXT storage_account DEFAULT 'datalakevamshi';
 
 -- COMMAND ----------
 
--- DBTITLE 2, Dynamic Managed Storage Path
--- Construct the managed storage location URL for the catalog
-SET spark.var.storage_account = :storage_account;
+-- DBTITLE 2, Create Storage Credentials & External Locations
+-- Create Storage Credential if not already present
+CREATE STORAGE CREDENTIAL IF NOT EXISTS sp_cred1
+WITH IDENTITY = 'ManagedIdentity';
 
--- COMMAND ----------
-
--- DBTITLE 3, Create External Location & Catalog with Explicit Managed Location
--- First, ensure external location exists for Unity Catalog
+-- Create External Locations using widget parameter markers
 CREATE EXTERNAL LOCATION IF NOT EXISTS ext_datalake_raw
-URL concat('abfss://raw@', :storage_account, '.dfs.core.windows.net/')
-WITH (STORAGE CREDENTIAL sp_cred);
+URL 'abfss://raw@${storage_account}.dfs.core.windows.net/'
+WITH (STORAGE CREDENTIAL sp_cred1);
 
 CREATE EXTERNAL LOCATION IF NOT EXISTS ext_datalake_curated
-URL concat('abfss://curated@', :storage_account, '.dfs.core.windows.net/')
-WITH (STORAGE CREDENTIAL sp_cred);
+URL 'abfss://curated@${storage_account}.dfs.core.windows.net/'
+WITH (STORAGE CREDENTIAL sp_cred1);
 
 -- COMMAND ----------
 
--- DBTITLE 4, Create Catalog with Explicit Managed Location (FIXES THE ERROR)
--- Providing MANAGED LOCATION avoids relying on missing metastore default storage
+-- DBTITLE 3, Create Catalog & Medallion Schemas
+-- Note: Unity Catalog creation in pure SQL requires an existing external location
 CREATE CATALOG IF NOT EXISTS banking_catalog
-MANAGED LOCATION concat('abfss://curated@', :storage_account, '.dfs.core.windows.net/banking_catalog');
+MANAGED LOCATION 'abfss://curated@${storage_account}.dfs.core.windows.net/banking_catalog';
 
 USE CATALOG banking_catalog;
 
