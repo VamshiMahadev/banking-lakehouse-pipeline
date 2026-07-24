@@ -1,14 +1,20 @@
 # Databricks notebook source
-# DBTITLE 1, Bronze Layer - Generic Auto Loader Ingestion
+# DBTITLE 1, Retrieve Parameters from Widgets
 from pyspark.sql.functions import current_timestamp, input_file_name
 
-# Configuration
-STORAGE_ACCOUNT = "datalakevamshi"
+# Define parameter widget
+dbutils.widgets.text("storage_account", "datalakevamshi")
+STORAGE_ACCOUNT = dbutils.widgets.get("storage_account")
+
+# Configuration using dynamic storage account parameter
 RAW_BASE_PATH = f"abfss://raw@{STORAGE_ACCOUNT}.dfs.core.windows.net/landing"
 CHECKPOINT_BASE = f"abfss://raw@{STORAGE_ACCOUNT}.dfs.core.windows.net/checkpoints/bronze"
 
 sources = ["customers", "accounts", "transactions", "loans", "credit_cards"]
 
+# COMMAND ----------
+
+# DBTITLE 2, Bronze Layer - Auto Loader Ingestion Execution
 def ingest_to_bronze(source_name: str):
     source_dir = f"{RAW_BASE_PATH}/{source_name}"
     checkpoint_dir = f"{CHECKPOINT_BASE}/{source_name}"
@@ -37,8 +43,8 @@ def ingest_to_bronze(source_name: str):
     )
     
     query.awaitTermination()
-    print(f"Successfully ingested {source_name} to {target_table}")
+    print(f"Successfully ingested {source_name} into {target_table}")
 
-# Process all sources
+# Process all landing entities
 for source in sources:
     ingest_to_bronze(source)
