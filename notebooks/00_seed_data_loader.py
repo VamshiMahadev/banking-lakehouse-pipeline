@@ -1,5 +1,7 @@
 # Databricks notebook source
 # DBTITLE 1, Parameters and Setup
+import os
+
 dbutils.widgets.text("storage_account", "datalakevamshi")
 STORAGE_ACCOUNT = dbutils.widgets.get("storage_account")
 
@@ -11,11 +13,11 @@ entities = ["customers", "accounts", "transactions", "loans", "credit_cards"]
 # COMMAND ----------
 
 # DBTITLE 2, Copy Local Repo CSV Files to Azure Data Lake
-import os
-
-# Identify where DABs deployed the local workspace files
-repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-data_dir = os.path.join(repo_root, "data")
+# Dynamically get current notebook's directory in Databricks Workspace
+notebook_path = dbutils.notebook.entry_point.getNotebookPath()
+# Go up one folder level from /notebooks to the bundle root, then into /data
+repo_root = os.path.dirname(os.path.dirname(notebook_path))
+data_dir = os.path.join("/Workspace", repo_root.lstrip("/"), "data")
 
 print(f"📂 Looking for sample CSV data in workspace path: {data_dir}")
 
