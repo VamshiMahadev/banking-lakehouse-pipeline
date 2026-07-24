@@ -1,16 +1,14 @@
 bundle:
   name: banking_lakehouse_bundle
 
-# 1. DEFINE BUNDLE VARIABLES
+# 1. BUNDLE VARIABLES (Only for non-secret workspace parameters)
 variables:
-  workspace_host:
-    description: "Databricks Workspace Host URL passed from secret"
   storage_account_name:
     description: "Name of the Azure Storage Account"
     default: "datalakevamshi"
   cluster_name:
     description: "Name of the target Databricks cluster"
-    default: "Vamshi Mahadev's Cluster 2026-07-24 18:05:46"
+    default: "my-banking-cluster"
 
 resources:
   jobs:
@@ -58,15 +56,13 @@ resources:
             notebook_path: ./notebooks/03_gold_reporting.py
 
 # 2. TARGET WORKSPACE CONFIGURATION
+# Databricks CLI automatically picks up host from the environment variable DATABRICKS_HOST
 targets:
   dev:
     mode: development
     default: true
-    workspace:
-      host: ${var.workspace_host}
       
   prod:
     mode: production
     workspace:
-      host: ${var.workspace_host}
       root_path: /Workspace/project/.bundle/${bundle.name}/${bundle.target}
