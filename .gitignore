@@ -1,0 +1,17 @@
+.env
+.terraform/
+terraform.tfstate*
+
+*.pem
+*.key
+
+venv/
+__pycache__/
+
+.vscode/
+.idea/
+
+*.csv
+*.json
+*.parquet
+*.xlsx
