@@ -1,6 +1,6 @@
 # Databricks notebook source
 # DBTITLE 1, Retrieve Parameters from Widgets
-from pyspark.sql.functions import current_timestamp, input_file_name
+from pyspark.sql.functions import current_timestamp, col
 
 # Define parameter widget
 dbutils.widgets.text("storage_account", "datalakevamshi")
@@ -33,7 +33,7 @@ def ingest_to_bronze(source_name: str):
     query = (
         df_stream
         .withColumn("_ingested_at", current_timestamp())
-        .withColumn("_source_file", input_file_name())
+        .withColumn("_source_file", col("_metadata.file_path")) # Fix: Replaced input_file_name() with col("_metadata.file_path")
         .writeStream
         .format("delta")
         .option("checkpointLocation", checkpoint_dir)
