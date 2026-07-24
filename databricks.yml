@@ -10,32 +10,32 @@ variables:
     description: "ID of the existing Databricks cluster"
     default: "0724-123038-m14eeun6"
 
+# 2. WORKFLOW RESOURCES
 resources:
   jobs:
     banking_etl_pipeline:
       name: Banking_Lakehouse_ETL_Pipeline
 
-
       tasks:
-        - task_key: download_sample_data
+        # Step 1: Upload seed data from repo to ADLS landing directory
+        - task_key: load_seed_data
           existing_cluster_id: ${var.existing_cluster_id}
           notebook_task:
-            notebook_path: ./notebooks/00_download_sample_data.py
+            notebook_path: ./notebooks/00_seed_data_loader.py
             base_parameters:
               storage_account: ${var.storage_account_name}
 
+        # Step 2: Setup Catalog & Schemas
         - task_key: setup_environment
           depends_on:
-            - task_key: download_sample_data
-          existing_cluster_id: ${var.existing_cluster_id}
-
-        - task_key: setup_environment
+            - task_key: load_seed_data
           existing_cluster_id: ${var.existing_cluster_id}
           notebook_task:
             notebook_path: ./ddl/00_setup_environment.sql
             base_parameters:
               storage_account: ${var.storage_account_name}
 
+        # Step 3: Bronze Auto Loader Ingestion
         - task_key: bronze_ingestion
           depends_on:
             - task_key: setup_environment
@@ -45,6 +45,7 @@ resources:
             base_parameters:
               storage_account: ${var.storage_account_name}
 
+        # Step 4: Silver Transformation
         - task_key: silver_transformation
           depends_on:
             - task_key: bronze_ingestion
@@ -52,6 +53,7 @@ resources:
           notebook_task:
             notebook_path: ./notebooks/02_silver_transformations.py
 
+        # Step 5: Gold Aggregations
         - task_key: gold_aggregations
           depends_on:
             - task_key: silver_transformation
@@ -59,17 +61,15 @@ resources:
           notebook_task:
             notebook_path: ./notebooks/03_gold_reporting.py
 
-# 2. TARGET WORKSPACE CONFIGURATION
+# 3. TARGET WORKSPACE CONFIGURATION
 targets:
   dev:
     mode: development
     default: true
     workspace:
-      # Dynamically uses the workspace user's directory without hardcoding email
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
       
   prod:
     mode: production
     workspace:
-      # Production bundle path stored under a generic system workspace folder
       root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
