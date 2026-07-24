@@ -1,91 +1,62 @@
-name: Banking Pipeline CI/CD
+bundle:
+  name: banking_lakehouse_bundle
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+# 1. BUNDLE VARIABLES
+variables:
+  storage_account_name:
+    description: "Name of the Azure Storage Account"
+    default: "datalakevamshi"
+  existing_cluster_id:
+    description: "ID of the existing Databricks cluster"
+    default: "0724-123038-m14eeun6"
 
-# Set working directory for all steps if files are in a subfolder
-defaults:
-  run:
-    working-directory: . # Change '.' to your subfolder path if applicable (e.g., ./banking-lakehouse-pipeline)
+resources:
+  jobs:
+    banking_etl_pipeline:
+      name: Banking_Lakehouse_ETL_Pipeline
 
-jobs:
-  validate:
-    name: Validate Databricks Bundle
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      tasks:
+        - task_key: setup_environment
+          existing_cluster_id: ${var.existing_cluster_id}
+          notebook_task:
+            notebook_path: ./ddl/00_setup_environment.sql
+            base_parameters:
+              storage_account: ${var.storage_account_name}
 
-      - name: Setup Databricks CLI
-        uses: databricks/setup-cli@main
+        - task_key: bronze_ingestion
+          depends_on:
+            - task_key: setup_environment
+          existing_cluster_id: ${var.existing_cluster_id}
+          notebook_task:
+            notebook_path: ./notebooks/01_bronze_ingestion.py
+            base_parameters:
+              storage_account: ${var.storage_account_name}
 
-      - name: Validate Databricks Asset Bundle
-        env:
-          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-        run: |
-          databricks bundle validate -t dev
+        - task_key: silver_transformation
+          depends_on:
+            - task_key: bronze_ingestion
+          existing_cluster_id: ${var.existing_cluster_id}
+          notebook_task:
+            notebook_path: ./notebooks/02_silver_transformations.py
 
-  deploy:
-    name: Deploy Bundle to Workspace
-    needs: validate
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+        - task_key: gold_aggregations
+          depends_on:
+            - task_key: silver_transformation
+          existing_cluster_id: ${var.existing_cluster_id}
+          notebook_task:
+            notebook_path: ./notebooks/03_gold_reporting.py
 
-      - name: Setup Databricks CLI
-        uses: databricks/setup-cli@main
-
-      - name: Deploy DAB Bundle to Workspace
-        env:
-          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-        run: |
-          databricks bundle deploy -t prod
-
-  run-and-verify:
-    name: Execute Pipeline & Validate Output
-    needs: deploy
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    steps:
-      - name: Checkout Code # MUST INCLUDE CHECKOUT IN THIS JOB TOO
-        uses: actions/checkout@v3
-
-      - name: Setup Databricks CLI
-        uses: databricks/setup-cli@main
-
-      - name: Trigger Databricks Workflow Run
-        env:
-          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-        run: |
-          RUN_ID=$(databricks bundle run banking_etl_pipeline -t prod -o json | jq -r '.run_id')
-          echo "Triggered Run ID: $RUN_ID"
-
-          if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
-            echo "❌ Failed to retrieve a valid Run ID."
-            exit 1
-          fi
-
-          while true; do
-            STATUS=$(databricks jobs get-run $RUN_ID -o json | jq -r '.state.life_cycle_state')
-            echo "Current Status: $STATUS"
-            if [ "$STATUS" == "TERMINATED" ] || [ "$STATUS" == "SKIPPED" ] || [ "$STATUS" == "INTERNAL_ERROR" ]; then
-              break
-            fi
-            sleep 15
-          done
-
-          RESULT=$(databricks jobs get-run $RUN_ID -o json | jq -r '.state.result_state')
-          if [ "$RESULT" != "SUCCESS" ]; then
-            echo "❌ Pipeline run failed with state: $RESULT"
-            exit 1
-          fi
-          echo "✅ Pipeline run completed successfully!"
+# 2. TARGET WORKSPACE CONFIGURATION
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      # Dynamically uses the workspace user's directory without hardcoding email
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+      
+  prod:
+    mode: production
+    workspace:
+      # Production bundle path stored under a generic system workspace folder
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
