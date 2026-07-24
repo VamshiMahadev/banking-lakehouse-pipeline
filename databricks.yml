@@ -8,7 +8,7 @@ variables:
     default: "datalakevamshi"
   existing_cluster_id:
     description: "ID of the existing Databricks cluster"
-    default: "0724-123038-m14eeun6" # Replace with your actual Cluster ID from Databricks UI
+    default: "0724-123038-m14eeun6"
 
 resources:
   jobs:
@@ -51,8 +51,12 @@ targets:
   dev:
     mode: development
     default: true
+    workspace:
+      # Dynamically uses the workspace user's directory without hardcoding email
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
       
   prod:
     mode: production
     workspace:
-      root_path: /Workspace/project/.bundle/${bundle.name}/${bundle.target}
+      # Production bundle path stored under a generic system workspace folder
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
