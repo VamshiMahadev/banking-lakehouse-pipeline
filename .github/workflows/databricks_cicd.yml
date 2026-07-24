@@ -5,17 +5,21 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  # STAGE 1: Linting and Validation
+  # =================================================================
+  # STAGE 1: VALIDATION
+  # =================================================================
   validate:
+    name: Validate Databricks Bundle
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
       - name: Setup Databricks CLI
-        uses: databricks/setup-cli@v0.2.1
+        uses: databricks/setup-cli@main  # FIXED: Changed from @v0.2.1 to @main
 
       - name: Validate Databricks Asset Bundle
         env:
@@ -24,17 +28,20 @@ jobs:
         run: |
           databricks bundle validate -t dev
 
-  # STAGE 2: Deployment
+  # =================================================================
+  # STAGE 2: DEPLOYMENT
+  # =================================================================
   deploy:
+    name: Deploy Bundle to Workspace
     needs: validate
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
       - name: Setup Databricks CLI
-        uses: databricks/setup-cli@v0.2.1
+        uses: databricks/setup-cli@main  # FIXED: Changed from @v0.2.1 to @main
 
       - name: Deploy DAB Bundle to Workspace
         env:
@@ -43,16 +50,19 @@ jobs:
         run: |
           databricks bundle deploy -t prod
 
-  # STAGE 3: Execute Job & Validate Results
+  # =================================================================
+  # STAGE 3: EXECUTION & VERIFICATION
+  # =================================================================
   run-and-verify:
+    name: Execute Pipeline & Validate Output
     needs: deploy
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Setup Databricks CLI
-        uses: databricks/setup-cli@v0.2.1
+        uses: databricks/setup-cli@main  # FIXED: Changed from @v0.2.1 to @main
 
-      - name: Trigger Databricks Workflow Execution
+      - name: Trigger Databricks Workflow Run
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
@@ -60,10 +70,9 @@ jobs:
           RUN_ID=$(databricks bundle run banking_etl_pipeline -t prod --json | jq -r '.run_id')
           echo "Triggered Run ID: $RUN_ID"
           
-          # Wait for execution completion
           while true; do
             STATUS=$(databricks runs get --run-id $RUN_ID --json | jq -r '.state.life_cycle_state')
-            echo "Current status: $STATUS"
+            echo "Current Status: $STATUS"
             if [ "$STATUS" == "TERMINATED" ] || [ "$STATUS" == "SKIPPED" ] || [ "$STATUS" == "INTERNAL_ERROR" ]; then
               break
             fi
@@ -72,7 +81,7 @@ jobs:
           
           RESULT=$(databricks runs get --run-id $RUN_ID --json | jq -r '.state.result_state')
           if [ "$RESULT" != "SUCCESS" ]; then
-            echo "Pipeline run failed with result state: $RESULT"
+            echo "❌ Pipeline run failed with state: $RESULT"
             exit 1
           fi
-          echo "Pipeline run completed successfully!"
+          echo "✅ Pipeline run completed successfully!"
