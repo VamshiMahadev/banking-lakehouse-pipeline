@@ -13,9 +13,14 @@ entities = ["customers", "accounts", "transactions", "loans", "credit_cards"]
 # COMMAND ----------
 
 # DBTITLE 2, Copy Local Repo CSV Files to Azure Data Lake
-# Dynamically get current notebook's directory in Databricks Workspace
-notebook_path = dbutils.notebook.entry_point.getNotebookPath()
-# Go up one folder level from /notebooks to the bundle root, then into /data
+# Safe way to fetch notebook path in modern Databricks runtimes / Spark Connect
+try:
+    notebook_path = dbutils.notebook.getContext().notebookPath().get()
+except Exception:
+    # Fallback via Spark configuration if getContext is unavailable
+    notebook_path = spark.conf.get("spark.databricks.notebook.path", "")
+
+# Navigate up from /notebooks to the bundle root, then into /data
 repo_root = os.path.dirname(os.path.dirname(notebook_path))
 data_dir = os.path.join("/Workspace", repo_root.lstrip("/"), "data")
 
@@ -41,4 +46,4 @@ for entity in entities:
         )
         print(f"✅ Successfully written 50 rows of '{entity}' to {target_adls_path}")
     else:
-        print(f"⚠️ File not found: {local_csv_path}")
+        print(f"⚠️ File not found at path: {local_csv_path}")
