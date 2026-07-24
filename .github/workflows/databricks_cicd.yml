@@ -50,7 +50,7 @@ jobs:
         run: |
           databricks bundle deploy -t prod
 
-  # =================================================================
+# =================================================================
   # STAGE 3: EXECUTION & VERIFICATION
   # =================================================================
   run-and-verify:
@@ -60,26 +60,34 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Setup Databricks CLI
-        uses: databricks/setup-cli@main  # FIXED: Changed from @v0.2.1 to @main
+        uses: databricks/setup-cli@main
 
       - name: Trigger Databricks Workflow Run
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
-          RUN_ID=$(databricks bundle run banking_etl_pipeline -t prod --json | jq -r '.run_id')
+          # 1. Trigger the run using -o json
+          RUN_ID=$(databricks bundle run banking_etl_pipeline -t prod -o json | jq -r '.run_id')
           echo "Triggered Run ID: $RUN_ID"
-          
+
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
+            echo "❌ Failed to retrieve a valid Run ID."
+            exit 1
+          fi
+
+          # 2. Poll status using 'databricks jobs get-run'
           while true; do
-            STATUS=$(databricks runs get --run-id $RUN_ID --json | jq -r '.state.life_cycle_state')
+            STATUS=$(databricks jobs get-run $RUN_ID -o json | jq -r '.state.life_cycle_state')
             echo "Current Status: $STATUS"
             if [ "$STATUS" == "TERMINATED" ] || [ "$STATUS" == "SKIPPED" ] || [ "$STATUS" == "INTERNAL_ERROR" ]; then
               break
             fi
             sleep 15
           done
-          
-          RESULT=$(databricks runs get --run-id $RUN_ID --json | jq -r '.state.result_state')
+
+          # 3. Verify final execution state
+          RESULT=$(databricks jobs get-run $RUN_ID -o json | jq -r '.state.result_state')
           if [ "$RESULT" != "SUCCESS" ]; then
             echo "❌ Pipeline run failed with state: $RESULT"
             exit 1
