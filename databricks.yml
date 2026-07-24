@@ -16,6 +16,10 @@ resources:
     banking_etl_pipeline:
       name: Banking_Lakehouse_ETL_Pipeline
 
+      permissions:
+        - level: CAN_MANAGE
+          group_name: users
+
       tasks:
         # Step 1: Upload seed data from repo to ADLS landing directory
         - task_key: load_seed_data
@@ -72,4 +76,4 @@ targets:
   prod:
     mode: production
     workspace:
-      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
