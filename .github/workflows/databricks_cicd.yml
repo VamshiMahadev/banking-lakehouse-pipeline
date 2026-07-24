@@ -7,18 +7,18 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-# Set working directory for all steps if files are in a subfolder
 defaults:
   run:
-    working-directory: . # Change '.' to your subfolder path if applicable (e.g., ./banking-lakehouse-pipeline)
+    working-directory: .
 
 jobs:
   validate:
     name: Validate Databricks Bundle
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Databricks CLI
         uses: databricks/setup-cli@main
@@ -35,14 +35,15 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Databricks CLI
         uses: databricks/setup-cli@main
 
-      - name: Deploy DAB Bundle to Workspace
+      - name: Deploy Databricks Asset Bundle
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
@@ -50,42 +51,32 @@ jobs:
           databricks bundle deploy -t prod
 
   run-and-verify:
-    name: Execute Pipeline & Validate Output
+    name: Execute Pipeline
     needs: deploy
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
     steps:
-      - name: Checkout Code # MUST INCLUDE CHECKOUT IN THIS JOB TOO
-        uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Setup Databricks CLI
         uses: databricks/setup-cli@main
 
-      - name: Trigger Databricks Workflow Run
+      - name: Execute Databricks Workflow
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
-          RUN_ID=$(databricks bundle run banking_etl_pipeline -t prod -o json | jq -r '.run_id')
-          echo "Triggered Run ID: $RUN_ID"
+          echo "Starting Banking Lakehouse ETL Pipeline..."
 
-          if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
-            echo "❌ Failed to retrieve a valid Run ID."
+          databricks bundle run banking_etl_pipeline -t prod
+
+          EXIT_CODE=$?
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ Pipeline execution failed."
             exit 1
           fi
 
-          while true; do
-            STATUS=$(databricks jobs get-run $RUN_ID -o json | jq -r '.state.life_cycle_state')
-            echo "Current Status: $STATUS"
-            if [ "$STATUS" == "TERMINATED" ] || [ "$STATUS" == "SKIPPED" ] || [ "$STATUS" == "INTERNAL_ERROR" ]; then
-              break
-            fi
-            sleep 15
-          done
-
-          RESULT=$(databricks jobs get-run $RUN_ID -o json | jq -r '.state.result_state')
-          if [ "$RESULT" != "SUCCESS" ]; then
-            echo "❌ Pipeline run failed with state: $RESULT"
-            exit 1
-          fi
-          echo "✅ Pipeline run completed successfully!"
+          echo "✅ Banking Lakehouse ETL Pipeline completed successfully."
