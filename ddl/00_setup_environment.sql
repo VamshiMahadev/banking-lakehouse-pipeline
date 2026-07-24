@@ -6,8 +6,7 @@ CREATE WIDGET TEXT storage_account DEFAULT 'datalakevamshi';
 
 -- DBTITLE 2, Create Storage Credentials & External Locations
 -- Create Storage Credential if not already present
-CREATE STORAGE CREDENTIAL IF NOT EXISTS sp_cred1
-WITH IDENTITY = 'ManagedIdentity';
+--CREATE STORAGE CREDENTIAL IF NOT EXISTS sp_cred1 WITH IDENTITY = 'ManagedIdentity';
 
 -- Create External Locations using widget parameter markers
 CREATE EXTERNAL LOCATION IF NOT EXISTS ext_datalake_raw
